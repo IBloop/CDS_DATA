@@ -4,6 +4,7 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
+console.log("Loaded API key:", process.env.API_KEY);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
