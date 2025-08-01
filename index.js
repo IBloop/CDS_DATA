@@ -4,7 +4,6 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 require('dotenv').config();
-console.log("Loaded API key:", process.env.API_KEY);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -16,6 +15,13 @@ if (!fs.existsSync(CACHE_DIR)) {
 
 app.get('/assets', async (req, res) => {
 	const { username, userId } = req.query;
+
+	const providedKey = req.headers['x-api-key'];
+
+	if (providedKey !== process.env.API_KEY) {
+		return res.status(403).send('Forbidden: Invalid API Key');
+	}
+
 	if (!username || !userId) return res.status(400).send('Missing username or userId');
 
 	const cacheFile = path.join(CACHE_DIR, `${userId}.json`);
