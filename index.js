@@ -16,10 +16,10 @@ if (!fs.existsSync(CACHE_DIR)) {
 app.get('/assets', async (req, res) => {
 	const { username, userId } = req.query;
 
-	const providedKey = req.headers['x-api-key'];
+	const fidgetMaster = req.headers['x-fidget-dot'];
 
-	if (providedKey !== process.env.API_KEY) {
-		return res.status(403).send('Forbidden: Invalid API Key');
+	if (fidgetMaster !== process.env.FIDGET_DOT) {
+		return res.status(403).send('Forbidden: Invalid fidget');
 	}
 
 	if (!username || !userId) return res.status(400).send('Missing username or userId');
@@ -66,3 +66,4 @@ app.get('/assets', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
