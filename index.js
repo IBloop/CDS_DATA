@@ -18,6 +18,9 @@ app.get('/assets', async (req, res) => {
 
 	const fidgetMaster = req.headers['x-fidget-dot'];
 
+	console.log(">>> Header value from Roblox:", fidgetMaster);
+	console.log(">>> Expected value from env var:", process.env.FIDGET_DOT);
+
 	if (fidgetMaster !== process.env.FIDGET_DOT) {
 		return res.status(403).send('Forbidden: Invalid fidget');
 	}
@@ -66,4 +69,5 @@ app.get('/assets', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
 
