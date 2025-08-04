@@ -1,4 +1,3 @@
-// index.js
 const express = require('express');
 const axios = require('axios');
 const fs = require('fs');
@@ -14,60 +13,70 @@ if (!fs.existsSync(CACHE_DIR)) {
 }
 
 app.get('/assets', async (req, res) => {
-	const { username, userId } = req.query;
+    const { username, userId } = req.query;
+    const fidgetMaster = req.headers['x-fidget-dot'];
 
-	const fidgetMaster = req.headers['x-fidget-dot'];
+    if (fidgetMaster !== process.env.FIDGET_DOT) {
+        return res.status(403).send('Forbidden: Invalid fidget');
+    }
 
-	console.log(">>> Header value from Roblox:", fidgetMaster);
-	console.log(">>> Expected value from env var:", process.env.FIDGET_DOT);
+    if (!username || !userId) return res.status(400).send('Missing username or userId');
 
-	if (fidgetMaster !== process.env.FIDGET_DOT) {
-		return res.status(403).send('Forbidden: Invalid fidget');
-	}
+    const cacheFile = path.join(CACHE_DIR, `${userId}.json`);
 
-	if (!username || !userId) return res.status(400).send('Missing username or userId');
+    if (fs.existsSync(cacheFile)) {
+        const stat = fs.statSync(cacheFile);
+        const age = (Date.now() - stat.mtimeMs) / 1000;
+        if (age < 600) {
+            const cachedData = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+            return res.json(cachedData);
+        }
+    }
 
-	const cacheFile = path.join(CACHE_DIR, `${userId}.json`);
+    try {
+      
+        const tshirtsUrl = `https://catalog.roproxy.com/v1/search/items/details?Category=3&CreatorName=${encodeURIComponent(username)}&assetType=2`;
+        const tshirtsResp = await axios.get(tshirtsUrl);
+        const tshirts = tshirtsResp.data.data || [];
 
-	// Serve from cache if under 10 minutes old
-	if (fs.existsSync(cacheFile)) {
-		const stat = fs.statSync(cacheFile);
-		const age = (Date.now() - stat.mtimeMs) / 1000;
-		if (age < 600) {
-			const cachedData = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
-			return res.json(cachedData);
-		}
-	}
+	    
+        const gamepasses = [];
+        let page = 1;
+        let done = false;
 
-	try {
-		const tshirtsUrl = `https://catalog.roproxy.com/v1/search/items/details?Category=3&CreatorName=${username}`;
-		const gamepassesUrl = `https://www.roproxy.com/users/inventory/list-json?assetTypeId=34&cursor=&itemsPerPage=100&pageNumber=1&userId=${userId}`;
+        while (!done) {
+            const url = `https://www.roproxy.com/users/inventory/list-json?assetTypeId=34&cursor=&itemsPerPage=100&pageNumber=${page}&userId=${userId}`;
+            const resp = await axios.get(url);
+            const items = resp.data?.Data?.Items || [];
 
-		const [tshirtsResp, gamepassesResp] = await Promise.all([
-			axios.get(tshirtsUrl),
-			axios.get(gamepassesUrl)
-		]);
+            if (items.length === 0) {
+                done = true;
+            } else {
+                for (const gp of items) {
+                    gamepasses.push({
+                        id: gp.Item.AssetId,
+                        price: gp.Product?.PriceInRobux || 0
+                    });
+                }
+                page++;
+            }
+        }
 
-		const tshirts = tshirtsResp.data.data || [];
-		const gamepassesRaw = gamepassesResp.data?.Data?.Items || [];
-		const gamepasses = gamepassesRaw.map(gp => ({
-			id: gp.Item.AssetId,
-			price: gp.Product?.PriceInRobux || 0
-		}));
+        const result = { tshirts, gamepasses, updated: new Date().toISOString() };
+        fs.writeFileSync(cacheFile, JSON.stringify(result), 'utf8');
 
-		const result = { tshirts, gamepasses, updated: new Date().toISOString() };
-		fs.writeFileSync(cacheFile, JSON.stringify(result), 'utf8');
-
-		res.json(result);
-	} catch (err) {
-		console.error(err);
-		res.status(500).send('Failed to fetch asset data');
-	}
+        res.json(result);
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Failed to fetch asset data');
+    }
 });
+
 
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
 
 
