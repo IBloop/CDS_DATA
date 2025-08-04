@@ -67,9 +67,18 @@ app.get('/assets', async (req, res) => {
 
         res.json(result);
     } catch (err) {
-        console.error(err);
-        res.status(500).send('Failed to fetch asset data');
+    console.error("=== ERROR WHILE FETCHING ASSET DATA ===");
+    console.error("Error message:", err.message);
+    if (err.response) {
+        console.error("Response status:", err.response.status);
+        console.error("Response data:", err.response.data);
+    } else if (err.request) {
+        console.error("No response received:", err.request);
+    } else {
+        console.error("Other error:", err);
     }
+    res.status(500).send('Failed to fetch asset data');
+}
 });
 
 
@@ -77,6 +86,7 @@ app.get('/assets', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
+
 
 
 
