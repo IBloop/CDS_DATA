@@ -13,6 +13,10 @@ if (!fs.existsSync(CACHE_DIR)) {
 }
 
 app.get('/assets', async (req, res) => {
+	
+    console.log('Received request with query:', req.query);
+    console.log('Headers:', req.headers);
+	
     const { username, userId } = req.query;
     const fidgetMaster = req.headers['x-fidget-dot'];
 
@@ -88,3 +92,4 @@ app.get('/assets', async (req, res) => {
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
 });
+
