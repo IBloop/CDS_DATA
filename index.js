@@ -34,12 +34,10 @@ app.get('/assets', async (req, res) => {
     }
 
     try {
-      
         const tshirtsUrl = `https://catalog.roproxy.com/v1/search/items/details?Category=3&CreatorName=${encodeURIComponent(username)}&assetType=2`;
         const tshirtsResp = await axios.get(tshirtsUrl);
         const tshirts = tshirtsResp.data.data || [];
 
-	    
         const gamepasses = [];
         let page = 1;
         let done = false;
@@ -66,33 +64,27 @@ app.get('/assets', async (req, res) => {
         fs.writeFileSync(cacheFile, JSON.stringify(result), 'utf8');
 
         res.json(result);
-   } catch (err) {
-    console.error("=== ERROR WHILE FETCHING ASSET DATA ===");
+    } catch (err) {
+        console.error("=== ERROR WHILE FETCHING ASSET DATA ===");
 
-    if (err.response) {
-        console.error("Error message:", err.message);
-        console.error("Response status:", err.response.status);
-        console.error("Response data:", JSON.stringify(err.response.data, null, 2));
-    } else if (err.request) {
-        console.error("No response received. Request was:", err.request);
-    } else {
-        console.error("Error message:", err.message);
+        if (err.response) {
+            console.error("Error message:", err.message);
+            console.error("Response status:", err.response.status);
+            console.error("Response data:", JSON.stringify(err.response.data, null, 2));
+        } else if (err.request) {
+            console.error("No response received. Request was:", err.request);
+        } else {
+            console.error("Error message:", err.message);
+        }
+
+        res.status(500).json({
+            error: "Internal Server Error",
+            message: err.message,
+            details: err.response?.data || null
+        });
     }
-
-    res.status(500).json({
-        error: "Internal Server Error",
-        message: err.message,
-        details: err.response?.data || null
-    });
-}
-
-
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
 });
 
-
-
-
-
-
+app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+});
