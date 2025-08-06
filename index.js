@@ -13,6 +13,7 @@ if (!fs.existsSync(CACHE_DIR)) {
   fs.mkdirSync(CACHE_DIR);
 }
 
+// Simple ping route to check server status
 app.get('/ping', (req, res) => {
   res.send('pong');
 });
@@ -29,62 +30,62 @@ app.get('/assets', async (req, res) => {
     return res.status(403).send('Forbidden: Invalid fidget');
   }
 
-  if (!username || !userId) return res.status(400).send('Missing username or userId');
+  if (!username || !userId) {
+    return res.status(400).send('Missing username or userId');
+  }
 
   const cacheFile = path.join(CACHE_DIR, `${userId}.json`);
 
+  // Serve cached data if it’s fresh (less than 10 minutes old)
   if (fs.existsSync(cacheFile)) {
     const stat = fs.statSync(cacheFile);
     const age = (Date.now() - stat.mtimeMs) / 1000;
     if (age < 600) {
       const cachedData = JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+      console.log(`Serving cached data for userId ${userId}`);
       return res.json(cachedData);
     }
   }
 
   try {
-    console.log("No cache file found, fetching fresh data");
-
+    console.log(`Fetching T-shirts for username: ${username}`);
     const tshirtsUrl = `https://catalog.roproxy.com/v1/search/items/details?Category=3&CreatorName=${encodeURIComponent(username)}&assetType=2`;
-    console.log("Fetching T-shirts from:", tshirtsUrl);
     const tshirtsResp = await axios.get(tshirtsUrl);
-    const tshirts = tshirtsResp.data.data || [];
+    const tshirts = tshirtsResp.data?.data || [];
     console.log(`Fetched ${tshirts.length} T-shirts`);
 
     let gamepasses = [];
+    let page = 1;
 
-    try {
-      let page = 1;
-      let done = false;
+    while (true) {
+      const gamepassesUrl = `https://www.roproxy.com/users/inventory/list-json?assetTypeId=34&cursor=&itemsPerPage=100&pageNumber=${page}&userId=${userId}`;
+      console.log(`Fetching gamepasses page ${page} from: ${gamepassesUrl}`);
 
-      while (!done) {
-        const url = `https://www.roproxy.com/users/inventory/list-json?assetTypeId=34&cursor=&itemsPerPage=100&pageNumber=${page}&userId=${userId}`;
-        console.log(`Fetching gamepasses page ${page} from:`, url);
-
-        const resp = await axios.get(url);
-
+      try {
+        const resp = await axios.get(gamepassesUrl);
         const items = resp.data?.Data?.Items || [];
         console.log(`Page ${page} returned ${items.length} gamepasses`);
 
-        if (items.length === 0) {
-          done = true;
-        } else {
-          for (const gp of items) {
-            const id = gp?.Item?.AssetId;
-            const price = gp?.Product?.PriceInRobux || 0;
-            if (id) {
-              gamepasses.push({ id, price });
-            }
+        if (items.length === 0) break;
+
+        for (const gp of items) {
+          // Match creator ID and avoid duplicates
+          if (gp.Creator?.Id == Number(userId) && !gamepasses.some(g => g.id === gp.Item.AssetId)) {
+            gamepasses.push({
+              id: gp.Item.AssetId,
+              price: gp.Product?.PriceInRobux || 0,
+            });
           }
-          page++;
         }
-      }
-    } catch (err) {
-      if (err.response && err.response.status === 404) {
-        console.warn("User has no gamepasses or inventory endpoint returned 404.");
-        gamepasses = [];
-      } else {
-        throw err; // escalate if not a 404
+
+        page++;
+      } catch (err) {
+        if (err.response && err.response.status === 404) {
+          console.log("Gamepasses endpoint returned 404, assuming no more gamepasses.");
+          break;
+        } else {
+          throw err;
+        }
       }
     }
 
@@ -94,7 +95,6 @@ app.get('/assets', async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error("=== ERROR WHILE FETCHING ASSET DATA ===");
-
     if (err.response) {
       console.error("Error message:", err.message);
       console.error("Response status:", err.response.status);
@@ -104,11 +104,10 @@ app.get('/assets', async (req, res) => {
     } else {
       console.error("Error message:", err.message);
     }
-
     res.status(500).json({
       error: "Internal Server Error",
       message: err.message,
-      details: err.response?.data || null
+      details: err.response?.data || null,
     });
   }
 });
